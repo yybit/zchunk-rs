@@ -552,6 +552,7 @@ pub struct Encoder<RW, R> {
 }
 
 impl<RW: Read + Write + Seek, R: Read> Encoder<RW, R> {
+    /// Construct an encoder from a raw file reader and a temp reader&writer
     pub fn new(reader: R, temp: RW) -> Result<Self, ZchunkError> {
         Ok(Self {
             header: None,
@@ -560,7 +561,7 @@ impl<RW: Read + Write + Seek, R: Read> Encoder<RW, R> {
         })
     }
 
-    /// split data of reader to chunks, and use zstd to compress chunks, write to temp writer [without header]
+    /// Split data of reader to chunks, and use zstd to compress chunks, write to temp writer [without header]
     pub fn prepare_chunks(&mut self) -> Result<(), ZchunkError> {
         let chunker = Chunker::default(&mut self.reader);
         let mut chunks = Vec::new();
@@ -606,7 +607,7 @@ impl<RW: Read + Write + Seek, R: Read> Encoder<RW, R> {
         Ok(())
     }
 
-    /// write header and chunks to `Write`, which require `prepare_chunks`
+    /// Write header and chunks to `Write`, which require `prepare_chunks`
     pub fn compress_to(&mut self, mut writer: impl Write) -> Result<(), ZchunkError> {
         let header = self.header.as_mut().ok_or(ZchunkError::HeaderNotFound)?;
         header.write_to(&mut writer, false)?;
@@ -626,6 +627,7 @@ pub struct Decoder<R> {
 }
 
 impl<R: BufRead + Seek> Decoder<R> {
+    /// Construct a decoder from a zchunk file reader
     pub fn new(mut reader: R) -> Result<Self, ZchunkError> {
         let lead = Lead::from_reader(&mut reader)?;
         let preface = Preface::from_reader(&mut reader)?;
@@ -650,9 +652,9 @@ impl<R: BufRead + Seek> Decoder<R> {
         })
     }
 
-    /// get chunk data by offset and chunk, no decompression
+    /// Get chunk data by offset and chunk, no decompression
     ///
-    /// offset is relative to the end of header, so seeking reader need plus header size
+    /// Offset is relative to the end of header, so seeking reader need plus header size
     fn get_chunk_data(&mut self, offset: u64, chunk: &Chunk) -> Result<Vec<u8>, ZchunkError> {
         let length = chunk.length.to_u64()? as usize;
         let mut buf = vec![0; length];
@@ -692,7 +694,7 @@ impl<R: BufRead + Seek> Decoder<R> {
         Ok(buf)
     }
 
-    /// get uncompressed dict chunk
+    /// Get uncompressed dict chunk
     fn get_uncompressed_dict(&mut self) -> Result<Option<Vec<u8>>, ZchunkError> {
         let dict_chunk = self.header.index.dict_chunk.clone();
         let data = self.get_chunk_data(0, &dict_chunk)?;
@@ -706,7 +708,7 @@ impl<R: BufRead + Seek> Decoder<R> {
         Ok(dict)
     }
 
-    /// decompress and assemble chunks, and write chunks to `Write`
+    /// Decompress and assemble chunks, and write chunks to `Write`
     pub fn decompress_to(&mut self, mut writer: impl Write) -> Result<(), ZchunkError> {
         let dict = self.get_uncompressed_dict()?;
 
@@ -736,7 +738,7 @@ impl<R: BufRead + Seek> Decoder<R> {
         Ok(())
     }
 
-    /// copy current zchunk reader to another writer, which using a cache zchunk file
+    /// Copy current zchunk reader to another writer, which using a cache zchunk file
     pub fn sync_to(
         &mut self,
         mut cache: Decoder<R>,

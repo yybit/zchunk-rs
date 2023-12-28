@@ -1,6 +1,6 @@
 use std::io::{self, Error, ErrorKind, Write};
 
-/// Extends [`Read`] with methods for reading variant int. (For `std::io`.)
+/// Extends `Read` with methods for reading variant int. (For `std::io`.)
 pub trait ReadVariantInt: io::Read {
     #[inline]
     fn read_variant_int(&mut self) -> Result<VariantInt, std::io::Error> {
@@ -44,7 +44,10 @@ pub trait WriteVariantInt: io::Write {
 
 impl<W: io::Write + ?Sized> WriteVariantInt for W {}
 
-/// VariantInt use LittleEndian.
+/// VariantInt is a variable-length integer
+///
+/// First bit of each byte is used to mark the end, 1: end, 0: not end
+/// Last seven bit of each byte store the data
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct VariantInt(Vec<u8>);
 
@@ -62,14 +65,17 @@ impl From<u64> for VariantInt {
 }
 
 impl VariantInt {
+    /// The number of bytes used in storage
     pub fn byte_size(&self) -> usize {
         self.0.len()
     }
 
+    /// Construct a variant int by loading bytes
     pub fn from_bytes(b: Vec<u8>) -> Self {
         Self(b)
     }
 
+    /// Convert the variant int to `u64`
     pub fn to_u64(&self) -> Result<u64, std::io::Error> {
         if self.0.len() > 10 {
             return Err(Error::new(
@@ -89,6 +95,7 @@ impl VariantInt {
         Ok(num)
     }
 
+    /// Store the variant int
     pub fn write_to(&self, mut writer: impl Write) -> Result<(), std::io::Error> {
         writer.write_all(&self.0)
     }
